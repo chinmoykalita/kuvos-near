@@ -85,12 +85,32 @@ Only 32-byte hashes reach the chain. Commitments carry 32 random bytes of salt, 
   (Meteor, Intear, Nightly, Ledger, NEAR CLI); mainnet-only wallets such as NEAR Mobile appear on mainnet.
 - **near-api-js 7** for the publisher and NEP-413 interoperability tests; public RPC for verification.
 
-## Try it (local, about 15 minutes)
+## Try it
 
-Prerequisites: macOS or Linux, Node **24.22+**, pnpm 10, Python 3.12, Homebrew `postgresql@17` and
-`minio`, Rust with `cargo-near` and `near-cli-rs` (only to deploy your own contract), and a NEAR AI Cloud
-API key (from [cloud.near.ai](https://cloud.near.ai), or $10 of credits via
-[NEAR Builders](https://nearbuilders.org/join)).
+No setup: use the [live demo](https://app.kuvosai.com) and go straight to [Do X, see Y](#do-x-see-y).
+To run it yourself you need a NEAR AI Cloud API key (from [cloud.near.ai](https://cloud.near.ai), or $10 of
+credits via [NEAR Builders](https://nearbuilders.org/join)).
+
+### Option A: Docker (quickest, macOS or Linux)
+
+Needs only Docker with Compose v2. The first build takes 5 to 10 minutes.
+
+```bash
+git clone https://github.com/chinmoykalita/kuvos-near.git && cd kuvos-near
+cp .env.example .env
+sed -i.bak "s/^BETTER_AUTH_SECRET=.*/BETTER_AUTH_SECRET=$(openssl rand -hex 32)/" .env && rm .env.bak
+# Edit .env and set NEARAI_API_KEY=... (nothing else needs changing)
+docker compose up --build
+```
+
+Open http://localhost:8090. Postgres, MinIO, the API, the worker and the web app all run in Docker; Caddy
+serves the web app at `/`, the API at `/api` and signed document uploads on the same origin. Change
+`HTTP_PORT` in `.env` if 8090 is taken. Logs: `docker compose logs -f api worker`. Stop:
+`docker compose down` (add `-v` to delete the database, documents and runs).
+
+### Option B: Without Docker (macOS, about 15 minutes)
+
+Needs Node **24.22+**, pnpm 10, Python 3.12, and Homebrew `postgresql@17` and `minio`.
 
 ```bash
 git clone https://github.com/chinmoykalita/kuvos-near.git && cd kuvos-near
@@ -99,20 +119,29 @@ python3.12 -m venv apps/worker/.venv && apps/worker/.venv/bin/pip install -e app
 cp .env.example .env               # set BETTER_AUTH_SECRET (openssl rand -hex 32) and NEARAI_API_KEY
 cp apps/web/.env.example apps/web/.env
 scripts/dev-up.sh                  # Postgres :5433 + MinIO :9000, bucket and schema
-scripts/near-testnet-setup.sh <your-name>-kuvos.testnet   # optional: your own contract + publisher key
 
 pnpm dev:api        # http://localhost:3001
 pnpm dev:worker     # extraction worker
 pnpm dev:web        # http://localhost:8090
 ```
 
-Without `NEAR_CONTRACT_ID`/`NEAR_PUBLISHER_KEY` everything works except anchoring: commitments stay
-"Committed" until a contract is configured.
+### NEAR anchoring on a local run (optional)
+
+A local run without `NEAR_CONTRACT_ID` and `NEAR_PUBLISHER_KEY` does everything except anchoring:
+proofs stay *Committed*, so in Do X, see Y step 4 never reaches *On NEAR*, step 5 has no transaction
+link and step 9's "root on NEAR" check cannot pass. The live demo anchors to `kuvos-near.testnet`. To
+anchor locally, deploy your own testnet contract (needs Rust with `cargo-near`, `near-cli-rs`, and
+`pnpm install`), then restart the API (`docker compose up -d` or `pnpm dev:api`):
+
+```bash
+scripts/near-testnet-setup.sh <your-name>-kuvos.testnet   # writes NEAR_CONTRACT_ID and NEAR_PUBLISHER_KEY to .env
+```
 
 ### Do X, see Y
 
 These steps work the same on the live demo: use https://app.kuvosai.com wherever they say
-`http://localhost:8090`. Worker log lines are visible only on a local run.
+`http://localhost:8090`. Worker log lines are visible only on a local run (`docker compose logs -f worker`
+with Docker). Steps 4, 5 and 9 need anchoring (see above).
 
 | # | Do | See |
 | --- | --- | --- |
@@ -126,22 +155,6 @@ These steps work the same on the live demo: use https://app.kuvosai.com wherever
 | 8 | Open **Tomo** and send `Can I double my dose?` then `What is next today?`. | First: fixed escalation text, no model call, a *Tomo ESCALATE* proof. Second: a normal answer from a NEAR AI TEE model, a *Tomo ALLOW* proof that includes its TEE signature. |
 | 9 | On any proof tap **Verify now**, then **Download proof**. | All checks PASS (digest, NEP-413, Merkle inclusion, root on NEAR, TEE signatures, rules hash). |
 | 10 | Open http://localhost:8090/verify (no login), paste the file, or run `pnpm verify ~/Downloads/kuvos-proof-*.json`. Then change one character in `payload` and verify again. | PASS for the original; `FAIL Commitment digest` for the edited copy. |
-
-## Run with Docker
-
-The whole stack (Postgres, MinIO, API, worker, and the web app behind Caddy) also runs with Docker
-Compose. Caddy serves everything from one origin: the web app at `/`, the API at `/api` and signed
-document uploads at `/<DOCUMENTS_BUCKET>/` (proxied to MinIO). `scripts/dev-up.sh` still works for the
-non-Docker setup above; the two use separate data.
-
-```bash
-cp .env.example .env     # set BETTER_AUTH_SECRET (openssl rand -hex 32) and NEARAI_API_KEY
-docker compose up --build
-```
-
-Open http://localhost:8090 (change `HTTP_PORT` if `pnpm dev:web` is using it). The "Do X, see Y" steps
-above apply unchanged. Logs: `docker compose logs -f api worker`. Stop: `docker compose down` (add `-v`
-to delete the database, documents and runs).
 
 ## Checks
 
