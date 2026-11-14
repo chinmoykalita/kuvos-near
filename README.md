@@ -8,6 +8,13 @@ assistant decision becomes a salted commitment anchored on **NEAR**. No health d
 > Synthetic data only. Kuvos does not diagnose, triage, give medical advice or create treatment plans. It
 > only organises instructions a clinician already wrote. Never upload a real patient document to this demo.
 
+**Live demo:** https://app.kuvosai.com (NEAR testnet; kept online through judging, at least until
+2026-11-25). Tap **Try the synthetic demo** or **Continue with NEAR** with a testnet wallet, then follow
+[Do X, see Y](#do-x-see-y) below. Proofs anchor to the `kuvos-near.testnet` contract.
+
+**Repository:** https://github.com/chinmoykalita/kuvos-near · Built at NEAR HACKATHON (tracks: Privacy &
+Private AI; AI Security & Defense).
+
 ## The problem
 
 After a hospital stay, families get a dense PDF of medicines, exercises, restrictions and appointments.
@@ -86,7 +93,7 @@ API key (from [cloud.near.ai](https://cloud.near.ai), or $10 of credits via
 [NEAR Builders](https://nearbuilders.org/join)).
 
 ```bash
-git clone <this repo> kuvos-near && cd kuvos-near
+git clone https://github.com/chinmoykalita/kuvos-near.git && cd kuvos-near
 pnpm install
 python3.12 -m venv apps/worker/.venv && apps/worker/.venv/bin/pip install -e apps/worker
 cp .env.example .env               # set BETTER_AUTH_SECRET (openssl rand -hex 32) and NEARAI_API_KEY
@@ -99,18 +106,18 @@ pnpm dev:worker     # extraction worker
 pnpm dev:web        # http://localhost:8090
 ```
 
-Production: the web app is served from **https://app.kuvosai.com** (`WEB_ORIGIN`), with the API on the
-same site so Better Auth's session cookie works. Local development uses `localhost:8090` and `:3001`.
-
 Without `NEAR_CONTRACT_ID`/`NEAR_PUBLISHER_KEY` everything works except anchoring: commitments stay
 "Committed" until a contract is configured.
 
 ### Do X, see Y
 
+These steps work the same on the live demo: use https://app.kuvosai.com wherever they say
+`http://localhost:8090`. Worker log lines are visible only on a local run.
+
 | # | Do | See |
 | --- | --- | --- |
 | 1 | Open http://localhost:8090 and tap **Continue with NEAR** (a free testnet account from [Meteor](https://wallet.meteorwallet.app) works), or **Try the synthetic demo** to skip the wallet. Finish the short setup (any name). | Today screen for a synthetic patient. With NEAR, the account is already linked as your signer. |
-| 2 | **Plan → Add document**, upload `samples/synthetic-discharge.pdf`, accept the AI processing notice. | "Reading your document" for about 30 seconds (about a minute for a photo, which is read by the vision model first). The worker log shows `NEAR AI request verified … signature=provider_tee` for each model call. |
+| 2 | **Plan → Add document**, upload [`samples/synthetic-discharge.pdf`](https://github.com/chinmoykalita/kuvos-near/raw/main/samples/synthetic-discharge.pdf) (download it first for the live demo), accept the AI processing notice. | "Reading your document" for about 30 seconds (about a minute for a photo, which is read by the vision model first). The worker log shows `NEAR AI request verified … signature=provider_tee` for each model call. |
 | 3 | Open the review. Tap an item. | The instruction beside its highlighted source text. Edit, accept or reject each item; fill reminder times. |
 | 4 | Confirm the plan. Open **Proofs** (sidebar) or **More → Proofs on NEAR**. | "Confirmed plan · version 1" in state *Committed*, then *On NEAR* within ~30 s. |
 | 5 | Open it. | Every confirmed item with its evidence IDs, the NEAR AI TEE signatures behind the draft, the Merkle root and a testnet transaction link. |
@@ -127,8 +134,6 @@ Compose. Caddy serves everything from one origin: the web app at `/`, the API at
 document uploads at `/<DOCUMENTS_BUCKET>/` (proxied to MinIO). `scripts/dev-up.sh` still works for the
 non-Docker setup above; the two use separate data.
 
-**Local**
-
 ```bash
 cp .env.example .env     # set BETTER_AUTH_SECRET (openssl rand -hex 32) and NEARAI_API_KEY
 docker compose up --build
@@ -137,58 +142,6 @@ docker compose up --build
 Open http://localhost:8090 (change `HTTP_PORT` if `pnpm dev:web` is using it). The "Do X, see Y" steps
 above apply unchanged. Logs: `docker compose logs -f api worker`. Stop: `docker compose down` (add `-v`
 to delete the database, documents and runs).
-
-**Server (Ubuntu, behind the host's nginx)**
-
-The stack's Caddy listens on `127.0.0.1:${HTTP_PORT}` only; the host's nginx terminates HTTPS for the
-site and proxies to it. Example below: `app.kuvosai.com` on port 8090.
-
-1. Docker with Compose v2 installed, and a DNS record for the site pointing at the server.
-   Building the web app needs about 4 GB of memory, so add swap on small servers.
-2. Create `~/kuvos-near/.env` on the server from `.env.example`, with these changes:
-
-   ```bash
-   NODE_ENV=production
-   PUBLIC_URL=https://app.kuvosai.com
-   HTTP_PORT=8090                   # any free loopback port
-   BETTER_AUTH_SECRET=...           # openssl rand -hex 32
-   POSTGRES_PASSWORD=...            # strong random value, fixed when the database is first created
-   AWS_SECRET_ACCESS_KEY=...        # strong random value (the MinIO root password)
-   NEARAI_API_KEY=...
-   NEAR_CONTRACT_ID=...             # optional: anchoring
-   NEAR_PUBLISHER_KEY=...
-   ```
-
-3. Add an nginx site (`/etc/nginx/sites-available/app.kuvosai.com`, linked into `sites-enabled`),
-   then `sudo certbot --nginx -d app.kuvosai.com`. Keep `Host $host`: upload URLs are signed for it.
-
-   ```nginx
-   server {
-       listen 80;
-       listen [::]:80;
-       server_name app.kuvosai.com;
-       client_max_body_size 50M;
-       location / {
-           proxy_pass http://127.0.0.1:8090;
-           proxy_http_version 1.1;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-           proxy_read_timeout 300s;
-       }
-   }
-   ```
-
-4. From your machine: `scripts/deploy.sh ubuntu@<server-ip>`. It copies the checkout to `~/kuvos-near`
-   (never `.env`, keys or `data/`) and runs `docker compose up -d --build`. Run it again to deploy
-   changes. Postgres and MinIO are never published outside Docker.
-
-On a server without a host proxy, Caddy can serve HTTPS itself: set `SITE_ADDRESS` to the domain,
-`HTTP_BIND=0.0.0.0`, `HTTP_PORT=80` and `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`.
-
-With `NODE_ENV=production` only the synthetic demo phone can sign in by OTP; Continue with NEAR works
-as usual.
 
 ## Checks
 
@@ -219,17 +172,19 @@ samples/        Synthetic discharge PDF (fictional patient, clinic and medicines
 scripts/        Local services, testnet setup, sample generator
 ```
 
-## Disclosure (NEAR HACKATHON rules Q-001, Q-002, Q-005)
+## Disclosure
 
-Kuvos is a pre-existing product (a private mobile app). This public repository is a NEAR edition built for
-NEAR HACKATHON from a snapshot of that codebase. **Baseline (pre-existing):** the care workflow (upload,
-extraction pipeline, review, plans, Today, Tomo chat, Care Circles) and the shared mobile UI. **Built in
-the hackathon window:** everything NEAR: the NEAR AI Cloud adapters and attestation records, the Tomo gate
-and its published rules, plan-version / activity / gate commitments, the Merkle publisher, the
-`kuvos-anchor` contract, NEP-413 wallet linking and signing, the Proofs and Verify screens, the offline
-verifier, `check:near` and `check:near-login`, Continue with NEAR sign-in, plus local MinIO support and the synthetic demo sign-in. An earlier Solana
-receipt experiment from the private codebase is not included. Libraries are listed in each
-`package.json`, `pyproject.toml` and `Cargo.toml`.
+- **Baseline:** Kuvos is an existing private app. This repo starts from a snapshot of it (commit
+  [`1843f90`](https://github.com/chinmoykalita/kuvos-near/commit/1843f90)): the care workflow and the shared
+  mobile UI (`packages/mobile-core`).
+- **Built during the hackathon:** all NEAR work: NEAR AI Cloud integration, Tomo gate, commitments and
+  Merkle anchoring, the `kuvos-anchor` contract, NEP-413 signing and Continue with NEAR, Proofs and
+  Verify screens, and the Docker setup. Changes since the snapshot:
+  [`1843f90...hackathon-submission`](https://github.com/chinmoykalita/kuvos-near/compare/1843f90...hackathon-submission).
+- **Libraries:** NestJS, Prisma, Better Auth, Expo, `@nearai/inference-sdk`, `nearai-inference-sdk`,
+  near-api-js, `@hot-labs/near-connect`, `near-sdk`; full lists in each `package.json`, `pyproject.toml`
+  and `Cargo.toml`.
+- **AI tools:** code was written with help from Claude Code.
 
 ## License
 

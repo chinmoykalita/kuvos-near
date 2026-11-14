@@ -2,7 +2,6 @@
 #
 # Local:   cp .env.example .env   (set BETTER_AUTH_SECRET and NEARAI_API_KEY)
 #          docker compose up --build        -> http://localhost:8090
-# Server:  see "Run with Docker" in README.md (adds docker-compose.prod.yml for HTTPS).
 #
 # Secrets and NEAR/NEAR AI settings come from .env. Values that differ inside Docker
 # (database, storage endpoints, public origin, data directory) are set below and win.
@@ -103,15 +102,10 @@ services:
     image: kuvos-near-web
     restart: unless-stopped
     environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
       DOCUMENTS_BUCKET: ${DOCUMENTS_BUCKET:?Set DOCUMENTS_BUCKET in .env}
     ports:
-      # Loopback by default: locally, and on a server where a host reverse proxy (nginx) fronts it.
-      # Set HTTP_BIND=0.0.0.0 only when Caddy itself faces the internet.
+      # Loopback only; put a reverse proxy in front to serve it publicly.
       - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8090}:80"
-    volumes:
-      - caddy-data:/data
-      - caddy-config:/config
     depends_on:
       - api
       - minio
@@ -120,5 +114,3 @@ volumes:
   postgres-data:
   minio-data:
   kuvos-data:
-  caddy-data:
-  caddy-config:
