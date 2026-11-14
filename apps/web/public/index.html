@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <title>Kuvos</title>
+    <meta name="description" content="Your care routine, followed through." />
+    <meta name="theme-color" content="#F4F5F9" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="kuvos" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #f4f5f9;
+        -webkit-font-smoothing: antialiased;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-text-size-adjust: 100%;
+      }
+      /* Keyboard users keep focus rings; pointer and touch focus (e.g. a dialog focusing itself) does not draw one. */
+      :focus:not(:focus-visible),
+      /* Scroll areas and dialog containers receive focus from the browser or a dialog's focus
+         trap; only real controls (which carry tabindex) draw a ring. */
+      div:not([tabindex]):focus {
+        outline: none;
+      }
+      /* Browser affordances the native components do not set themselves. */
+      [role='button'],
+      [role='link'],
+      [role='checkbox'],
+      [role='switch'],
+      [role='tab'] {
+        cursor: pointer;
+      }
+      [aria-disabled='true'] {
+        cursor: default;
+      }
+      ::selection {
+        background: rgba(40, 84, 221, 0.18);
+      }
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(12, 28, 51, 0.18) transparent;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        height: 100dvh;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>You need to enable JavaScript to run Kuvos.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

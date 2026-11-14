@@ -1,0 +1,16 @@
+{
+  "name": "kuvos-near",
+  "private": true,
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.13.1",
+  "engines": { "node": ">=24.22.1" },
+  "scripts": {
+    "dev:api": "pnpm --filter @kuvos-near/api start:dev",
+    "dev:web": "pnpm --filter @kuvos-near/web start",
+    "dev:worker": "apps/worker/.venv/bin/python -m kuvos_worker",
+    "build": "pnpm --recursive --if-present build",
+    "lint": "pnpm --recursive --if-present lint",
+    "check:near": "pnpm --filter @kuvos-near/api check:near",
+    "verify": "pnpm --filter @kuvos-near/api verify:bundle"
+  }
+}

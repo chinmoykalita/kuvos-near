@@ -1,0 +1,7 @@
+packages:
+  - apps/api
+  - apps/web
+  - packages/mobile-core
+
+# Native modules must resolve to one physical installation.
+nodeLinker: hoisted

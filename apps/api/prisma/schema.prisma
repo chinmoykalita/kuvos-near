@@ -1,0 +1,466 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ExtractionStatus {
+  UPLOADING
+  QUEUED
+  PROCESSING
+  REVIEW_READY
+  FAILED
+  CONFIRMED
+}
+
+enum PlanStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum OccurrenceStatus {
+  SCHEDULED
+  DONE
+  SKIPPED
+  MISSED
+}
+
+enum CareRole {
+  PATIENT
+  CAREGIVER
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SUBMITTED
+  ACCEPTED
+  FAILED
+}
+
+model User {
+  id                             String            @id
+  name                           String
+  email                          String            @unique
+  emailVerified                  Boolean           @default(false)
+  image                          String?
+  phoneNumber                    String?           @unique
+  phoneNumberVerified            Boolean?
+  aiProcessingConsentVersion     String?           @map("ai_processing_consent_version")
+  aiProcessingConsentedAt        DateTime?         @map("ai_processing_consented_at")
+  aiProcessingConsentWithdrawnAt DateTime?         @map("ai_processing_consent_withdrawn_at")
+  chatProcessingConsentedAt      DateTime?         @map("chat_processing_consented_at")
+  chatProcessingConsentVersion   String?           @map("chat_processing_consent_version")
+  createdAt                      DateTime          @default(now())
+  updatedAt                      DateTime          @updatedAt
+  sessions                       Session[]
+  accounts                       Account[]
+  createdPatients                PatientProfile[]  @relation("PatientCreator")
+  careMemberships                CareMembership[]
+  sentInvitations                CareInvitation[]  @relation("InvitationSender")
+  uploadedDocuments              Document[]        @relation("DocumentUploader")
+  confirmedPlans                 Plan[]            @relation("PlanConfirmer")
+  occurrenceLogs                 OccurrenceLog[]   @relation("OccurrenceActor")
+  auditEvents                    AuditEvent[]      @relation("AuditActor")
+  pushDevices                    PushDevice[]
+  chatTurns                      ChatTurn[]
+  chatMemories                   ChatMemory[]
+  nearWallet                     NearWallet?
+
+  @@map("user")
+}
+
+model AccountDeletionRequest {
+  id          String    @id @default(uuid())
+  email       String?
+  phoneNumber String?   @map("phone_number")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  notifiedAt  DateTime? @map("notified_at")
+  resolvedAt  DateTime? @map("resolved_at")
+
+  @@index([email, createdAt])
+  @@index([phoneNumber, createdAt])
+  @@index([createdAt])
+  @@map("account_deletion_requests")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model PatientProfile {
+  id                    String           @id @default(uuid())
+  name                  String
+  timezone              String
+  markOpenBeforeMinutes Int              @default(90) @map("mark_open_before_minutes")
+  markCloseAfterMinutes Int              @default(180) @map("mark_close_after_minutes")
+  /// Usual wake, sleep, meal and exercise times; reminder-time suggestions only.
+  dailyRoutine          Json?            @map("daily_routine")
+  /// Self-reported gender, age, height, weight and long-term conditions; profile only, never used for plans.
+  healthProfile         Json?            @map("health_profile")
+  createdById           String           @map("created_by_id")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+  createdBy             User             @relation("PatientCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships           CareMembership[]
+  invitations           CareInvitation[]
+  documents             Document[]
+  plans                 Plan[]
+  auditEvents           AuditEvent[]
+  chatTurns             ChatTurn[]
+  chatMemories          ChatMemory[]
+  nearEvents            NearEvent[]
+
+  @@map("patient_profiles")
+}
+
+model ChatTurn {
+  id        String         @id @default(uuid())
+  requestId String         @map("request_id")
+  userId    String         @map("user_id")
+  patientId String         @map("patient_id")
+  text      String
+  reply     Json
+  createdAt DateTime       @default(now()) @map("created_at")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, patientId, requestId])
+  @@index([userId, patientId, createdAt])
+  @@map("chat_turns")
+}
+
+model ChatMemory {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  patientId String         @map("patient_id")
+  text      String
+  createdAt DateTime       @default(now()) @map("created_at")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([userId, patientId, createdAt])
+  @@map("chat_memories")
+}
+
+model CareMembership {
+  id                     String                 @id @default(uuid())
+  patientId              String                 @map("patient_id")
+  userId                 String                 @map("user_id")
+  role                   CareRole
+  missedAlertsEnabled    Boolean                @default(false) @map("missed_alerts_enabled")
+  missedAlertsEnabledAt  DateTime?              @map("missed_alerts_enabled_at")
+  joinedAt               DateTime               @default(now()) @map("joined_at")
+  revokedAt              DateTime?              @map("revoked_at")
+  patient                PatientProfile         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationDeliveries NotificationDelivery[]
+
+  @@unique([patientId, userId])
+  @@index([userId, revokedAt])
+  @@map("care_memberships")
+}
+
+model CareInvitation {
+  id          String         @id @default(uuid())
+  patientId   String         @map("patient_id")
+  invitedById String         @map("invited_by_id")
+  phoneNumber String?        @map("phone_number")
+  email       String?
+  role        CareRole
+  expiresAt   DateTime       @map("expires_at")
+  acceptedAt  DateTime?      @map("accepted_at")
+  revokedAt   DateTime?      @map("revoked_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  invitedBy   User           @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([phoneNumber, acceptedAt, revokedAt])
+  @@index([email, acceptedAt, revokedAt])
+  @@index([patientId])
+  @@map("care_invitations")
+}
+
+model AuditEvent {
+  id          String         @id @default(uuid())
+  actorUserId String         @map("actor_user_id")
+  patientId   String         @map("patient_id")
+  action      String
+  metadata    Json?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  actor       User           @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, createdAt])
+  @@map("audit_events")
+}
+
+model Document {
+  id           String          @id @default(uuid())
+  patientId    String?         @map("patient_id")
+  uploadedById String?         @map("uploaded_by_id")
+  fileName     String          @map("file_name")
+  path         String
+  mimeType     String          @map("mime_type")
+  size         Int
+  createdAt    DateTime        @default(now()) @map("created_at")
+  patient      PatientProfile? @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  uploadedBy   User?           @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  extractions  Extraction[]
+
+  @@index([patientId, createdAt])
+  @@map("documents")
+}
+
+model Extraction {
+  id          String           @id @default(uuid())
+  documentId  String           @map("document_id")
+  planId      String?          @map("plan_id")
+  status      ExtractionStatus @default(QUEUED)
+  result      Json?
+  review      Json?
+  runDir      String?          @map("run_dir")
+  error       String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  startedAt   DateTime?        @map("started_at")
+  completedAt DateTime?        @map("completed_at")
+  document    Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  plan        Plan?            @relation(fields: [planId], references: [id], onDelete: Restrict)
+  planItems   PlanItem[]
+
+  @@index([status, createdAt])
+  @@index([planId])
+  @@map("extractions")
+}
+
+model Plan {
+  id            String         @id @default(uuid())
+  patientId     String         @map("patient_id")
+  name          String
+  suggestedName String         @map("suggested_name")
+  confirmedById String?        @map("confirmed_by_id")
+  status        PlanStatus     @default(ACTIVE)
+  timezone      String
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  closedAt      DateTime?      @map("closed_at")
+  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  confirmedBy   User?          @relation("PlanConfirmer", fields: [confirmedById], references: [id], onDelete: Restrict)
+  extractions   Extraction[]
+  items         PlanItem[]
+
+  @@index([patientId, status])
+  @@map("plans")
+}
+
+model PlanItem {
+  id              String       @id @default(uuid())
+  planId          String       @map("plan_id")
+  extractionId    String       @map("extraction_id")
+  candidateId     String       @map("candidate_id")
+  category        String
+  instructionText String       @map("instruction_text")
+  actionText      String?      @map("action_text")
+  explanation     Json?
+  fields          Json
+  schedule        Json
+  evidenceSpanIds Json         @map("evidence_span_ids")
+  physio          Json?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  plan            Plan         @relation(fields: [planId], references: [id], onDelete: Cascade)
+  extraction      Extraction   @relation(fields: [extractionId], references: [id], onDelete: Restrict)
+  occurrences     Occurrence[]
+
+  @@unique([planId, extractionId, candidateId])
+  @@index([extractionId])
+  @@map("plan_items")
+}
+
+model Occurrence {
+  id                     String                 @id @default(uuid())
+  planItemId             String                 @map("plan_item_id")
+  scheduledAt            DateTime               @map("scheduled_at")
+  status                 OccurrenceStatus       @default(SCHEDULED)
+  planItem               PlanItem               @relation(fields: [planItemId], references: [id], onDelete: Cascade)
+  logs                   OccurrenceLog[]
+  notificationDeliveries NotificationDelivery[]
+
+  @@unique([planItemId, scheduledAt])
+  @@index([scheduledAt, status])
+  @@map("occurrences")
+}
+
+model PushDevice {
+  id            String                 @id @default(uuid())
+  userId        String                 @map("user_id")
+  expoPushToken String                 @unique @map("expo_push_token")
+  platform      String
+  disabledAt    DateTime?              @map("disabled_at")
+  lastSeenAt    DateTime               @default(now()) @map("last_seen_at")
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries    NotificationDelivery[]
+
+  @@index([userId, disabledAt])
+  @@map("push_devices")
+}
+
+model NotificationDelivery {
+  id               String                     @id @default(uuid())
+  occurrenceId     String                     @map("occurrence_id")
+  membershipId     String                     @map("membership_id")
+  pushDeviceId     String                     @map("push_device_id")
+  status           NotificationDeliveryStatus @default(PENDING)
+  scheduledFor     DateTime                   @map("scheduled_for")
+  nextAttemptAt    DateTime                   @default(now()) @map("next_attempt_at")
+  attempts         Int                        @default(0)
+  expoTicketId     String?                    @map("expo_ticket_id")
+  submittedAt      DateTime?                  @map("submitted_at")
+  receiptCheckedAt DateTime?                  @map("receipt_checked_at")
+  error            String?
+  createdAt        DateTime                   @default(now()) @map("created_at")
+  updatedAt        DateTime                   @updatedAt @map("updated_at")
+  occurrence       Occurrence                 @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+  membership       CareMembership             @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  pushDevice       PushDevice                 @relation(fields: [pushDeviceId], references: [id], onDelete: Cascade)
+
+  @@unique([occurrenceId, membershipId, pushDeviceId], map: "notification_delivery_once_per_device")
+  @@index([status, nextAttemptAt])
+  @@map("notification_deliveries")
+}
+
+model OccurrenceLog {
+  id           String           @id @default(uuid())
+  occurrenceId String           @map("occurrence_id")
+  actorUserId  String?          @map("actor_user_id")
+  action       String
+  reason       String?
+  note         String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  occurrence   Occurrence       @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+  actor        User?            @relation("OccurrenceActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@map("occurrence_logs")
+}
+
+
+/// NEAR account a Kuvos user linked with a NEP-413 signature. Used only to sign commitments.
+model NearWallet {
+  userId           String    @id @map("user_id")
+  accountId        String?   @map("account_id")
+  publicKey        String?   @map("public_key")
+  connectedAt      DateTime? @map("connected_at")
+  pendingAccountId String?   @map("pending_account_id")
+  challenge        String?
+  challengeNonce   String?   @map("challenge_nonce")
+  challengeExpires DateTime? @map("challenge_expires")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("near_wallets")
+}
+
+/// Private, salted commitment for one provable care event. Only `digest` reaches NEAR,
+/// inside a batch Merkle root. Kinds: plan_version, activity, gate_decision.
+model NearEvent {
+  id              String         @id @default(uuid())
+  kind            String
+  subjectId       String         @map("subject_id")
+  patientId       String         @map("patient_id")
+  actorId         String?        @map("actor_id")
+  payload         String
+  digest          String         @unique
+  previousId      String?        @map("previous_id")
+  signerAccountId String?        @map("signer_account_id")
+  signerPublicKey String?        @map("signer_public_key")
+  signature       String?
+  signedAt        DateTime?      @map("signed_at")
+  batchId         String?        @map("batch_id")
+  leafIndex       Int?           @map("leaf_index")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  batch           NearBatch?     @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([kind, subjectId])
+  @@index([patientId, createdAt])
+  @@index([batchId])
+  @@map("near_events")
+}
+
+/// One Merkle root anchored on NEAR with the publisher's function-call key.
+model NearBatch {
+  id          String      @id @default(uuid())
+  root        String
+  leaves      Json
+  status      String      @default("FROZEN")
+  transaction String?
+  signedTx    String?     @map("signed_tx")
+  publisher   String
+  contract    String
+  network     String
+  error       String?
+  submittedAt DateTime?   @map("submitted_at")
+  anchoredAt  DateTime?   @map("anchored_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  events      NearEvent[]
+
+  @@index([status, createdAt])
+  @@map("near_batches")
+}
+
+/// Versioned Tomo gate rules. The hash is published on NEAR; the rules stay public in the repo.
+model NearPolicy {
+  version     Int       @id
+  hash        String    @unique
+  rules       Json
+  transaction String?
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("near_policies")
+}

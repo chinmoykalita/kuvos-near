@@ -1,0 +1,23 @@
+node_modules/
+.pnpm-store/
+.env
+.env.local
+.env.*.local
+*.keypair.json
+.near-credentials/
+dist/
+.expo/
+web-build/
+coverage/
+*.tsbuildinfo
+*.pem
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+target/
+# Local runs, documents and storage may contain sensitive data.
+data/
+.DS_Store
+*.log

@@ -1,0 +1,37 @@
+{
+  "fonts": {
+    "regular": "Inter_400Regular",
+    "medium": "Inter_500Medium",
+    "semibold": "Inter_600SemiBold",
+    "hand": "Kalam_300Light",
+    "handMedium": "Kalam_300Light",
+    "serif": "Lora_400Regular",
+    "serifItalic": "Lora_400Regular_Italic"
+  },
+  "colors": {
+    "cobalt": "#2854DD",
+    "deepBlue": "#0C1C33",
+    "aqua": "#08BFD1",
+    "freshGreen": "#187345",
+    "lime": "#9CE7BE",
+    "coral": "#B23A32",
+    "sun": "#FFF1D5",
+    "cloud": "#F4F5F9",
+    "ice": "#E4F3EB",
+    "white": "#FFFFFF",
+    "ink": "#0C1C33",
+    "slate": "#4C5B70",
+    "line": "#DDE3EC",
+    "mist": "#9FB3E6"
+  },
+  "type": {
+    "display": { "size": 28, "lineHeight": 34 },
+    "title": { "size": 22, "lineHeight": 28 },
+    "brand": { "size": 20, "lineHeight": 24 },
+    "button": { "size": 16, "lineHeight": 22 },
+    "body": { "size": 15, "lineHeight": 22 },
+    "caption": { "size": 13, "lineHeight": 18 },
+    "small": { "size": 12, "lineHeight": 16 },
+    "eyebrow": { "size": 11, "lineHeight": 14, "letterSpacing": 1.5 }
+  }
+}

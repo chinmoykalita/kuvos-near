@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Kuvos",
+    "slug": "kuvos-web",
+    "version": "1.0.0",
+    "scheme": "kuvos-web",
+    "userInterfaceStyle": "light",
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "Kuvos",
+      "shortName": "kuvos",
+      "description": "Your care routine, followed through.",
+      "themeColor": "#F3F8FC",
+      "backgroundColor": "#F3F8FC",
+      "display": "standalone",
+      "orientation": "portrait"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "authStoragePrefix": "kuvos-web",
+      "wordmark": "Kuvos"
+    }
+  }
+}

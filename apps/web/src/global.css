@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Keep text-field focus visible without the browser's bright rectangular outline. */
+:is(input:not([type]), input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="time"], input[type="search"], input[type="password"], textarea):focus {
+  outline: none;
+  box-shadow: inset 0 -2px 0 #4c5b70;
+}
