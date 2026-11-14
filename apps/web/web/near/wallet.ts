@@ -34,7 +34,15 @@ async function connectedWallet(network: string) {
   const wallet = await near.connect();
   const accounts = await wallet.getAccounts();
   if (!accounts[0]) throw new Error('The wallet did not share a NEAR account.');
-  return { wallet, accountId: accounts[0].accountId };
+  // Web wallets open a new window for every approval, and browsers only allow that right after
+  // a click. Approving the connection uses up this click, so signing needs the next tap.
+  throw new WalletConnected(accounts[0].accountId);
+}
+
+export class WalletConnected extends Error {
+  constructor(readonly accountId: string) {
+    super(`Connected ${accountId}. Tap again to sign.`);
+  }
 }
 
 // Links the person's NEAR account with a one-use NEP-413 challenge checked by the API.

@@ -110,6 +110,7 @@ export function SignInScreen() {
   const returnTo = invitationId ? `/join/${invitationId}` : '/';
   const [onboardingName, setOnboardingName] = useState('');
   const [pending, setPending] = useState<Provider | 'demo' | 'near' | null>(null);
+  const [nearAccount, setNearAccount] = useState('');
   const [error, setError] = useState(() => providerError(typeof params.error === 'string' ? params.error : undefined));
 
   useEffect(() => {
@@ -145,8 +146,18 @@ export function SignInScreen() {
     setPending('near');
     setError('');
     try {
-      const { signInWithNear } = await import('../../near/wallet');
-      await signInWithNear();
+      const { signInWithNear, WalletConnected } = await import('../../near/wallet');
+      try {
+        await signInWithNear();
+      } catch (caught) {
+        // Connecting used up this tap; the next tap opens the wallet's signing window.
+        if (caught instanceof WalletConnected) {
+          setNearAccount(caught.accountId);
+          setPending(null);
+          return;
+        }
+        throw caught;
+      }
       window.location.assign(returnTo);
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : 'NEAR sign-in did not finish.');
@@ -225,7 +236,9 @@ export function SignInScreen() {
               {pending === 'near' ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text className="text-base font-semibold text-white">Continue with NEAR</Text>
+                <Text className="text-base font-semibold text-white">
+                  {nearAccount ? `Sign in as ${nearAccount}` : 'Continue with NEAR'}
+                </Text>
               )}
             </Pressable>
           )}

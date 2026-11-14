@@ -38,9 +38,11 @@ export function SignPlanScreen() {
     setBusy(true);
     setError('');
     try {
+      // Each wallet approval opens a window and needs its own tap: link first, then sign.
       if (!wallet?.accountId) {
         await linkNearAccount(network);
         refresh();
+        return;
       }
       setBundle(await signCommitment(network, bundle));
     } catch (caught) {
@@ -98,7 +100,7 @@ export function SignPlanScreen() {
           ) : (
             <>
               <Button
-                title={wallet?.accountId ? `Sign as ${wallet.accountId}` : 'Link NEAR account and sign'}
+                title={wallet?.accountId ? `Sign as ${wallet.accountId}` : 'Link NEAR account'}
                 loading={busy}
                 onPress={() => void sign()}
               />
