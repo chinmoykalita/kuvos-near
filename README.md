@@ -16,7 +16,7 @@ The synthetic demo is one shared account, so other visitors may see what you upl
 own account, use **Continue with NEAR**.
 
 **Repository:** https://github.com/chinmoykalita/kuvos-near · Built at NEAR HACKATHON (tracks: Privacy &
-Private AI; AI Security & Defense).
+Private AI; AI Security & Defense; Open Innovation).
 
 ## The problem
 
