@@ -1,0 +1,29 @@
+# One origin for the browser: the web app, the API under /api, and signed document uploads
+# under /<bucket>/ (path-style S3 URLs). Caddy keeps the Host header, so MinIO's signature
+# check sees the same host the API signed for (S3_PUBLIC_ENDPOINT_URL).
+#
+# SITE_ADDRESS ":80" serves plain HTTP (local). A domain such as "app.kuvosai.com" makes Caddy
+# obtain and renew a Let's Encrypt certificate automatically (ports 80 and 443 must be open).
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:3001
+	}
+
+	handle /{$DOCUMENTS_BUCKET}/* {
+		reverse_proxy minio:9000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

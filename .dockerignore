@@ -1,0 +1,23 @@
+# Keep build contexts small and free of secrets, local data and model output.
+.git
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/.expo
+**/web-build
+**/test-results
+**/.venv
+**/__pycache__
+**/*.egg-info
+**/target
+**/*.keypair.json
+**/.near-credentials
+**/*.pem
+**/*.log
+data
+apps/worker/data
+samples
+contracts
+.DS_Store

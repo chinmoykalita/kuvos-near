@@ -21,16 +21,27 @@ import { validSignature } from './workflow.utils';
 export class DocumentStorageService {
   readonly bucket: string;
   readonly client: S3Client;
+  // Signs the browser's upload URLs. Same as `client` unless S3_PUBLIC_ENDPOINT_URL is set.
+  private readonly signer: S3Client;
 
   constructor(config: ConfigService) {
     this.bucket = config.get('DOCUMENTS_BUCKET', '');
     // AWS_ENDPOINT_URL_S3 points the SDK at a local S3-compatible store (MinIO) for the
     // self-contained judge setup; path-style addressing is required there.
-    this.client = new S3Client({
-      region: config.get('AWS_REGION') || config.get('AWS_DEFAULT_REGION'),
-      requestChecksumCalculation: 'WHEN_REQUIRED',
+    const options = {
+      region:
+        config.get<string>('AWS_REGION') ||
+        config.get<string>('AWS_DEFAULT_REGION'),
+      requestChecksumCalculation: 'WHEN_REQUIRED' as const,
       forcePathStyle: config.get('S3_FORCE_PATH_STYLE') === 'true',
-    });
+    };
+    this.client = new S3Client(options);
+    // In Docker the API reaches MinIO at an internal host the browser cannot resolve, so
+    // upload URLs are signed for the public origin that proxies to MinIO instead.
+    const publicEndpoint = config.get<string>('S3_PUBLIC_ENDPOINT_URL');
+    this.signer = publicEndpoint
+      ? new S3Client({ ...options, endpoint: publicEndpoint })
+      : this.client;
   }
 
   location(path: string) {
@@ -55,7 +66,7 @@ export class DocumentStorageService {
       'If-None-Match': '*',
     };
     const url = await getSignedUrl(
-      this.client,
+      this.signer,
       new PutObjectCommand({
         ...this.location(path),
         ContentLength: size,

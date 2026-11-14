@@ -1,0 +1,8 @@
+# For a server where Caddy faces the internet directly (no host nginx on 80/443): publishes 443,
+# and Caddy gets the certificate for SITE_ADDRESS automatically. Set in the server's .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml  HTTP_BIND=0.0.0.0  HTTP_PORT=80
+services:
+  web:
+    ports:
+      - "443:443"
+      - "443:443/udp"

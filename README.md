@@ -120,6 +120,76 @@ Without `NEAR_CONTRACT_ID`/`NEAR_PUBLISHER_KEY` everything works except anchorin
 | 9 | On any proof tap **Verify now**, then **Download proof**. | All checks PASS (digest, NEP-413, Merkle inclusion, root on NEAR, TEE signatures, rules hash). |
 | 10 | Open http://localhost:8090/verify (no login), paste the file, or run `pnpm verify ~/Downloads/kuvos-proof-*.json`. Then change one character in `payload` and verify again. | PASS for the original; `FAIL Commitment digest` for the edited copy. |
 
+## Run with Docker
+
+The whole stack (Postgres, MinIO, API, worker, and the web app behind Caddy) also runs with Docker
+Compose. Caddy serves everything from one origin: the web app at `/`, the API at `/api` and signed
+document uploads at `/<DOCUMENTS_BUCKET>/` (proxied to MinIO). `scripts/dev-up.sh` still works for the
+non-Docker setup above; the two use separate data.
+
+**Local**
+
+```bash
+cp .env.example .env     # set BETTER_AUTH_SECRET (openssl rand -hex 32) and NEARAI_API_KEY
+docker compose up --build
+```
+
+Open http://localhost:8090 (change `HTTP_PORT` if `pnpm dev:web` is using it). The "Do X, see Y" steps
+above apply unchanged. Logs: `docker compose logs -f api worker`. Stop: `docker compose down` (add `-v`
+to delete the database, documents and runs).
+
+**Server (Ubuntu, behind the host's nginx)**
+
+The stack's Caddy listens on `127.0.0.1:${HTTP_PORT}` only; the host's nginx terminates HTTPS for the
+site and proxies to it. Example below: `app.kuvosai.com` on port 8090.
+
+1. Docker with Compose v2 installed, and a DNS record for the site pointing at the server.
+   Building the web app needs about 4 GB of memory, so add swap on small servers.
+2. Create `~/kuvos-near/.env` on the server from `.env.example`, with these changes:
+
+   ```bash
+   NODE_ENV=production
+   PUBLIC_URL=https://app.kuvosai.com
+   HTTP_PORT=8090                   # any free loopback port
+   BETTER_AUTH_SECRET=...           # openssl rand -hex 32
+   POSTGRES_PASSWORD=...            # strong random value, fixed when the database is first created
+   AWS_SECRET_ACCESS_KEY=...        # strong random value (the MinIO root password)
+   NEARAI_API_KEY=...
+   NEAR_CONTRACT_ID=...             # optional: anchoring
+   NEAR_PUBLISHER_KEY=...
+   ```
+
+3. Add an nginx site (`/etc/nginx/sites-available/app.kuvosai.com`, linked into `sites-enabled`),
+   then `sudo certbot --nginx -d app.kuvosai.com`. Keep `Host $host`: upload URLs are signed for it.
+
+   ```nginx
+   server {
+       listen 80;
+       listen [::]:80;
+       server_name app.kuvosai.com;
+       client_max_body_size 50M;
+       location / {
+           proxy_pass http://127.0.0.1:8090;
+           proxy_http_version 1.1;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+           proxy_read_timeout 300s;
+       }
+   }
+   ```
+
+4. From your machine: `scripts/deploy.sh ubuntu@<server-ip>`. It copies the checkout to `~/kuvos-near`
+   (never `.env`, keys or `data/`) and runs `docker compose up -d --build`. Run it again to deploy
+   changes. Postgres and MinIO are never published outside Docker.
+
+On a server without a host proxy, Caddy can serve HTTPS itself: set `SITE_ADDRESS` to the domain,
+`HTTP_BIND=0.0.0.0`, `HTTP_PORT=80` and `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`.
+
+With `NODE_ENV=production` only the synthetic demo phone can sign in by OTP; Continue with NEAR works
+as usual.
+
 ## Checks
 
 ```bash

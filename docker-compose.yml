@@ -1,0 +1,127 @@
+# Kuvos NEAR: the whole stack in Docker (Postgres, MinIO, API, worker, web behind Caddy).
+#
+# Local:   cp .env.example .env   (set BETTER_AUTH_SECRET and NEARAI_API_KEY)
+#          docker compose up --build        -> http://localhost:8090
+# Server:  see "Run with Docker" in README.md (adds docker-compose.prod.yml for HTTPS).
+#
+# Secrets and NEAR/NEAR AI settings come from .env. Values that differ inside Docker
+# (database, storage endpoints, public origin, data directory) are set below and win.
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://kuvos:${POSTGRES_PASSWORD:-kuvos}@postgres:5432/kuvos_near
+  AWS_ENDPOINT_URL_S3: http://minio:9000
+  S3_FORCE_PATH_STYLE: "true"
+  KUVOS_DATA_DIR: /data
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kuvos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kuvos}
+      POSTGRES_DB: kuvos_near
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kuvos -d kuvos_near"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: creates the documents bucket (idempotent).
+  storage-init:
+    build: { context: ., dockerfile: docker/worker.Dockerfile }
+    image: kuvos-near-worker
+    command: ["python", "-I", "scripts/create-bucket.py"]
+    env_file: .env
+    environment: *app-env
+    depends_on:
+      minio: { condition: service_healthy }
+
+  # One-shot: applies Prisma migrations before the API and worker start.
+  migrate:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    image: kuvos-near-api
+    user: root
+    command: ["npx", "prisma", "migrate", "deploy", "--config", "prisma7.config.ts"]
+    env_file: .env
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    image: kuvos-near-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      PORT: "3001"
+      WEB_ORIGIN: &public-url ${PUBLIC_URL:-http://localhost:8090}
+      BETTER_AUTH_URL: *public-url
+      # Browser uploads go through Caddy on the public origin, so sign URLs for that host.
+      S3_PUBLIC_ENDPOINT_URL: *public-url
+    volumes:
+      - kuvos-data:/data
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      storage-init: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: ., dockerfile: docker/worker.Dockerfile }
+    image: kuvos-near-worker
+    restart: unless-stopped
+    env_file: .env
+    environment: *app-env
+    volumes:
+      - kuvos-data:/data
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      storage-init: { condition: service_completed_successfully }
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        EXPO_PUBLIC_API_URL: ${PUBLIC_URL:-http://localhost:8090}/api
+        EXPO_PUBLIC_DEMO_SIGN_IN: ${EXPO_PUBLIC_DEMO_SIGN_IN:-true}
+        EXPO_PUBLIC_SOCIAL_SIGN_IN: ${EXPO_PUBLIC_SOCIAL_SIGN_IN:-false}
+    image: kuvos-near-web
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      DOCUMENTS_BUCKET: ${DOCUMENTS_BUCKET:?Set DOCUMENTS_BUCKET in .env}
+    ports:
+      # Loopback by default: locally, and on a server where a host reverse proxy (nginx) fronts it.
+      # Set HTTP_BIND=0.0.0.0 only when Caddy itself faces the internet.
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8090}:80"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - minio
+
+volumes:
+  postgres-data:
+  minio-data:
+  kuvos-data:
+  caddy-data:
+  caddy-config:
