@@ -1,7 +1,8 @@
 # Kuvos on NEAR: provable, private care plans
 
-**Kuvos** turns the discharge instructions a patient already received into a daily routine that a person
-reviews and confirms. This repository is the NEAR edition: a private AI reads the document inside TEEs on
+**Kuvos** turns the care instructions a patient already received (a discharge summary PDF, a scanned
+letter, or a photo of a printed or handwritten prescription) into a daily routine that a person reviews
+and confirms. This repository is the NEAR edition: a private AI reads the document inside TEEs on
 **NEAR AI Cloud**, a human confirms every line against its source, and every confirmed plan, check-in and
 assistant decision becomes a salted commitment anchored on **NEAR**. No health data ever goes on-chain.
 
@@ -11,13 +12,16 @@ assistant decision becomes a salted commitment anchored on **NEAR**. No health d
 **Live demo:** https://app.kuvosai.com (NEAR testnet; kept online through judging, at least until
 2026-11-25). Tap **Try the synthetic demo** or **Continue with NEAR** with a testnet wallet, then follow
 [Do X, see Y](#do-x-see-y) below. Proofs anchor to the `kuvos-near.testnet` contract.
+The synthetic demo is one shared account, so other visitors may see what you upload and confirm; for your
+own account, use **Continue with NEAR**.
 
 **Repository:** https://github.com/chinmoykalita/kuvos-near · Built at NEAR HACKATHON (tracks: Privacy &
 Private AI; AI Security & Defense).
 
 ## The problem
 
-After a hospital stay, families get a dense PDF of medicines, exercises, restrictions and appointments.
+After a hospital stay or a clinic visit, families get a dense PDF, a printed sheet or a handwritten
+prescription covering medicines, exercises, restrictions and appointments.
 AI can structure it, but in healthcare two questions block adoption:
 
 1. **Who saw the document?** Discharge summaries are special-category health data.
@@ -146,7 +150,7 @@ with Docker). Steps 4, 5 and 9 need anchoring (see above).
 | # | Do | See |
 | --- | --- | --- |
 | 1 | Open http://localhost:8090 and tap **Continue with NEAR** (a free testnet account from [Meteor](https://wallet.meteorwallet.app) works), or **Try the synthetic demo** to skip the wallet. Finish the short setup (any name). | Today screen for a synthetic patient. With NEAR, the account is already linked as your signer. |
-| 2 | **Plan → Add document**, upload [`samples/synthetic-discharge.pdf`](https://github.com/chinmoykalita/kuvos-near/raw/main/samples/synthetic-discharge.pdf) (download it first for the live demo), accept the AI processing notice. | "Reading your document" for about 30 seconds (about a minute for a photo, which is read by the vision model first). The worker log shows `NEAR AI request verified … signature=provider_tee` for each model call. |
+| 2 | **Plan → Add document**, upload [`samples/synthetic-discharge.pdf`](https://github.com/chinmoykalita/kuvos-near/raw/main/samples/synthetic-discharge.pdf) (download it first for the live demo), or a photo or scan of synthetic instructions, printed or handwritten (PDF, PNG, JPG or TIFF). Accept the AI processing notice. | "Reading your document" for about 30 seconds (about a minute for a photo, which is read by the vision model first). The worker log shows `NEAR AI request verified … signature=provider_tee` for each model call. |
 | 3 | Open the review. Tap an item. | The instruction beside its highlighted source text. Edit, accept or reject each item; fill reminder times. |
 | 4 | Confirm the plan. Open **Proofs** (sidebar) or **More → Proofs on NEAR**. | "Confirmed plan · version 1" in state *Committed*, then *On NEAR* within ~30 s. |
 | 5 | Open it. | Every confirmed item with its evidence IDs, the NEAR AI TEE signatures behind the draft, the Merkle root and a testnet transaction link. |
